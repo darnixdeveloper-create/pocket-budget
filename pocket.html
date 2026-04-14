@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pocket Budget TZ - Mpango wa Fedha</title>
+    <meta name="description" content="Programu ya usimamizi wa fedha binafsi kwa Watanzania.">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest" crossorigin></script>
+    
+    <!-- Recharts -->
+    <script src="https://cdn.jsdelivr.net/npm/recharts/umd/Recharts.min.js" crossorigin></script>
+    
+    <!-- Framer Motion -->
+    <!-- Removed for stability in standalone version -->
+
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error("Global Error:", message, "at", source, ":", lineno);
+            return false;
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.1);
+        }
+        .glass-dark {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .glass-emerald {
+            background: rgba(16, 185, 129, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .glass-white {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { 
+            PieChart = ({children}) => <div>{children}</div>, 
+            Pie = () => null, 
+            Cell = () => null, 
+            ResponsiveContainer = ({children}) => <div>{children}</div>, 
+            BarChart = ({children}) => <div>{children}</div>, 
+            Bar = () => null, 
+            XAxis = () => null, 
+            YAxis = () => null, 
+            Tooltip = () => null, 
+            Legend = () => null 
+        } = window.Recharts || {};
+
+        // --- Icons Wrapper ---
+        const Icon = ({ name, className = "w-5 h-5" }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    try {
+                        window.lucide.createIcons();
+                    } catch (e) {
+                        console.error("Lucide error:", e);
+                    }
+                }
+            }, [name]);
+            return <i data-lucide={name} className={className}></i>;
+        };
+
+        // --- Components ---
+        const Card = ({ children, className = "" }) => (
+            <div className={`bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden ${className}`}>
+                {children}
+            </div>
+        );
+
+        const Button = ({ children, onClick, className = "", variant = "primary", size = "md" }) => {
+            const variants = {
+                primary: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200",
+                secondary: "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50",
+                ghost: "text-slate-600 hover:bg-slate-100",
+                danger: "bg-red-500 text-white hover:bg-red-600"
+            };
+            const sizes = {
+                sm: "px-3 py-1.5 text-sm",
+                md: "px-6 py-3",
+                lg: "px-8 py-4 text-lg"
+            };
+            return (
+                <button 
+                    onClick={onClick} 
+                    className={`rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 ${variants[variant]} ${sizes[size]} ${className}`}
+                >
+                    {children}
+                </button>
+            );
+        };
+
+        const Input = ({ label, ...props }) => (
+            <div className="space-y-1.5 w-full">
+                {label && <label className="text-sm font-bold text-slate-700 ml-1">{label}</label>}
+                <input 
+                    {...props} 
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all bg-white/50"
+                />
+            </div>
+        );
+
+        // --- App Logic ---
+        function App() {
+            const [isLandingPage, setIsLandingPage] = useState(true);
+            const [password, setPassword] = useState(() => localStorage.getItem('budget_pwd') || "");
+            const [isLocked, setIsLocked] = useState(true);
+            const [loginInput, setLoginInput] = useState("");
+            const [newPwdInput, setNewPwdInput] = useState("");
+            const [confirmPwdInput, setConfirmPwdInput] = useState("");
+            const [loginError, setLoginError] = useState("");
+            const [setupError, setSetupError] = useState("");
+            const [showResetConfirm, setShowResetConfirm] = useState(false);
+            const [apiKey, setApiKey] = useState(() => localStorage.getItem('budget_api_key') || "");
+            const [showSettings, setShowSettings] = useState(false);
+
+            const [advice, setAdvice] = useState("");
+            const [isGettingAdvice, setIsGettingAdvice] = useState(false);
+            const [income, setIncome] = useState(() => JSON.parse(localStorage.getItem('budget_income') || "[]"));
+            const [expenses, setExpenses] = useState(() => JSON.parse(localStorage.getItem('budget_expenses') || "[]"));
+            const [goals, setGoals] = useState(() => JSON.parse(localStorage.getItem('budget_goals') || "[]"));
+            const [activeTab, setActiveTab] = useState("dashboard");
+            const [showAddTransaction, setShowAddTransaction] = useState(false);
+            const [showAddGoal, setShowAddGoal] = useState(false);
+            const [editingId, setEditingId] = useState(null);
+            const [filterType, setFilterType] = useState('all');
+            const [filterCategory, setFilterCategory] = useState('all');
+            const [sortBy, setSortBy] = useState('date-desc');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [newTransaction, setNewTransaction] = useState({ description: '', amount: '', category: 'Chakula', type: 'expense', isNecessary: true });
+            const [newGoal, setNewGoal] = useState({ name: '', targetAmount: '', deadline: '' });
+
+            const handleAddTransaction = () => {
+                const transaction = {
+                    id: editingId || Date.now().toString(),
+                    ...newTransaction,
+                    amount: Number(newTransaction.amount),
+                    date: new Date().toISOString()
+                };
+
+                if (editingId) {
+                    // Remove old one first
+                    setIncome(income.filter(i => i.id !== editingId));
+                    setExpenses(expenses.filter(e => e.id !== editingId));
+                    
+                    if (newTransaction.type === 'income') {
+                        setIncome(prev => [...prev.filter(i => i.id !== editingId), transaction]);
+                    } else {
+                        setExpenses(prev => [...prev.filter(e => e.id !== editingId), transaction]);
+                    }
+                } else {
+                    if (newTransaction.type === 'income') {
+                        setIncome([...income, transaction]);
+                    } else {
+                        setExpenses([...expenses, transaction]);
+                    }
+                }
+                
+                setShowAddTransaction(false);
+                setEditingId(null);
+                setNewTransaction({ description: '', amount: '', category: 'Chakula', type: 'expense', isNecessary: true });
+            };
+
+            const handleEditTransaction = (t) => {
+                setNewTransaction({
+                    description: t.description,
+                    amount: t.amount.toString(),
+                    category: t.category,
+                    type: t.type,
+                    isNecessary: t.isNecessary ?? true
+                });
+                setEditingId(t.id);
+                setShowAddTransaction(true);
+            };
+
+            const handleDeleteTransaction = (id) => {
+                setIncome(income.filter(i => i.id !== id));
+                setExpenses(expenses.filter(e => e.id !== id));
+            };
+
+            const handleDeleteGoal = (id) => {
+                setGoals(goals.filter(g => g.id !== id));
+            };
+
+            const handleAddGoal = () => {
+                const goal = {
+                    id: Date.now().toString(),
+                    name: newGoal.name,
+                    targetAmount: Number(newGoal.targetAmount),
+                    deadline: newGoal.deadline,
+                    currentAmount: 0
+                };
+                setGoals([...goals, goal]);
+                setShowAddGoal(false);
+                setNewGoal({ name: '', targetAmount: '', deadline: '' });
+            };
+            useEffect(() => {
+                localStorage.setItem('budget_income', JSON.stringify(income));
+                localStorage.setItem('budget_expenses', JSON.stringify(expenses));
+                localStorage.setItem('budget_goals', JSON.stringify(goals));
+            }, [income, expenses, goals]);
+
+            const handleSetPassword = () => {
+                if (newPwdInput.length < 4) {
+                    setSetupError("Nywila lazima iwe na herufi angalau 4");
+                    return;
+                }
+                if (newPwdInput !== confirmPwdInput) {
+                    setSetupError("Nywila hazifanani");
+                    return;
+                }
+                localStorage.setItem('budget_pwd', newPwdInput);
+                setPassword(newPwdInput);
+                setIsLocked(false);
+                setSetupError("");
+            };
+
+            const handleLogin = () => {
+                if (loginInput === password) {
+                    setIsLocked(false);
+                    setLoginError("");
+                } else {
+                    setLoginError("Nywila si sahihi!");
+                }
+            };
+
+            const handleReset = () => {
+                localStorage.clear();
+                window.location.reload();
+            };
+
+            const handleLogout = () => {
+                setIsLocked(true);
+                setLoginInput("");
+                setIsLandingPage(true);
+            };
+
+            // Calculations
+            const totalIncome = income.reduce((sum, item) => sum + item.amount, 0);
+            const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+            const necessaryExpenses = expenses.filter(e => e.isNecessary).reduce((sum, item) => sum + item.amount, 0);
+            const luxuryExpenses = totalExpenses - necessaryExpenses;
+            const balance = totalIncome - totalExpenses;
+
+            const allTransactions = useMemo(() => {
+                const inc = income.map(i => ({ ...i, type: 'income' }));
+                const exp = expenses.map(e => ({ ...e, type: 'expense' }));
+                let filtered = [...inc, ...exp];
+
+                if (filterType !== 'all') {
+                    filtered = filtered.filter(t => t.type === filterType);
+                }
+                if (filterCategory !== 'all') {
+                    filtered = filtered.filter(t => t.category === filterCategory);
+                }
+                if (searchTerm) {
+                    filtered = filtered.filter(t => t.description.toLowerCase().includes(searchTerm.toLowerCase()));
+                }
+
+                return filtered.sort((a, b) => {
+                    if (sortBy === 'date-desc') return new Date(b.date) - new Date(a.date);
+                    if (sortBy === 'date-asc') return new Date(a.date) - new Date(b.date);
+                    if (sortBy === 'amount-desc') return b.amount - a.amount;
+                    if (sortBy === 'amount-asc') return a.amount - b.amount;
+                    return 0;
+                });
+            }, [income, expenses, filterType, filterCategory, sortBy, searchTerm]);
+
+            const categoryData = useMemo(() => {
+                const cats = {};
+                expenses.forEach(e => {
+                    cats[e.category] = (cats[e.category] || 0) + e.amount;
+                });
+                return Object.entries(cats).map(([name, value]) => ({ name, value }));
+            }, [expenses]);
+
+            const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
+
+            // --- Views ---
+            if (isLandingPage) {
+                return (
+                    <div className="min-h-screen bg-slate-50">
+                        <nav className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-50">
+                            <div className="max-w-6xl mx-auto px-6 h-20 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-emerald-600 p-2 rounded-xl shadow-lg">
+                                        <Icon name="wallet" className="text-white w-6 h-6" />
+                                    </div>
+                                    <span className="text-xl font-black text-slate-900">Pocket Budget TZ</span>
+                                </div>
+                                <Button onClick={() => setIsLandingPage(false)}>Ingia / Anza</Button>
+                            </div>
+                        </nav>
+
+                        <section className="py-20 px-6 max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+                            <div className="space-y-8">
+                                <div className="inline-block px-4 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold">
+                                    #1 Programu ya Fedha Tanzania 🇹🇿
+                                </div>
+                                <h1 className="text-5xl lg:text-7xl font-black leading-tight">
+                                    Dhibiti <span className="gradient-text">Fedha</span> Zako kwa Urahisi.
+                                </h1>
+                                <p className="text-xl text-slate-600 leading-relaxed">
+                                    Pocket Budget TZ inakusaidia kufuatilia mshahara, matumizi, na kufikia malengo yako ya akiba.
+                                </p>
+                                <Button size="lg" onClick={() => setIsLandingPage(false)}>Anza Sasa Bure</Button>
+                            </div>
+                            <div className="relative">
+                                <img src="https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=1000" className="rounded-[2.5rem] shadow-2xl border-4 border-white" alt="App" referrerPolicy="no-referrer" />
+                            </div>
+                        </section>
+                    </div>
+                );
+            }
+
+            if (!password) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-cover bg-center" style={{backgroundImage: 'url(https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=2000)'}}>
+                        <div className="absolute inset-0 bg-emerald-900/40 backdrop-blur-sm"></div>
+                        <Card className="w-full max-w-md relative z-10 p-8 space-y-6 glass">
+                            <div className="text-center space-y-2">
+                                <div className="bg-emerald-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-xl animate-float">
+                                    <Icon name="shield-check" className="text-white w-8 h-8" />
+                                </div>
+                                <h2 className="text-2xl font-black">Weka Ulinzi</h2>
+                                <p className="text-slate-500">Weka nywila yako ili kulinda data zako.</p>
+                            </div>
+                            <div className="space-y-4">
+                                <Input type="password" label="Nywila Mpya" value={newPwdInput} onChange={e => setNewPwdInput(e.target.value)} placeholder="****" />
+                                <Input type="password" label="Thibitisha Nywila" value={confirmPwdInput} onChange={e => setConfirmPwdInput(e.target.value)} placeholder="****" />
+                                {setupError && <p className="text-red-500 text-sm font-bold text-center">{setupError}</p>}
+                                <Button className="w-full" onClick={handleSetPassword}>Hifadhi Nywila</Button>
+                            </div>
+                        </Card>
+                    </div>
+                );
+            }
+
+            if (isLocked) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-cover bg-center" style={{backgroundImage: 'url(https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=2000)'}}>
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"></div>
+                        <Card className="w-full max-w-md relative z-10 p-8 space-y-6 glass">
+                            <div className="text-center space-y-2">
+                                <div className="bg-emerald-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto shadow-xl">
+                                    <Icon name="lock" className="text-white w-8 h-8" />
+                                </div>
+                                <h2 className="text-2xl font-black">Karibu Tena</h2>
+                                <p className="text-slate-500">Ingiza nywila yako ili kuendelea.</p>
+                            </div>
+                            <div className="space-y-4">
+                                <Input type="password" value={loginInput} onChange={e => setLoginInput(e.target.value)} placeholder="Ingiza Nywila" onKeyPress={e => e.key === 'Enter' && handleLogin()} />
+                                {loginError && <p className="text-red-500 text-sm font-bold text-center">{loginError}</p>}
+                                <Button className="w-full" onClick={handleLogin}>Fungua</Button>
+                                <button onClick={() => setShowResetConfirm(true)} className="w-full text-sm text-slate-400 hover:text-red-400 transition-colors">Umesahau Nywila? Anza Upya</button>
+                            </div>
+                        </Card>
+                        {showResetConfirm && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+                                <Card className="w-full max-w-sm p-6 space-y-4">
+                                    <h3 className="text-xl font-bold text-red-600">Onyo!</h3>
+                                    <p className="text-slate-600">Ukifuta nywila, data zako zote zitafutika. Je, una uhakika?</p>
+                                    <div className="flex gap-3">
+                                        <Button variant="danger" className="flex-1" onClick={handleReset}>Ndiyo, Futa Zote</Button>
+                                        <Button variant="secondary" className="flex-1" onClick={() => setShowResetConfirm(false)}>Ghairi</Button>
+                                    </div>
+                                </Card>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen pb-24">
+                    {/* Header */}
+                    <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-40">
+                        <div className="max-w-6xl mx-auto px-6 h-20 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-emerald-600 p-2 rounded-xl">
+                                    <Icon name="wallet" className="text-white w-5 h-5" />
+                                </div>
+                                <span className="font-black text-xl">Pocket Budget</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button variant="ghost" onClick={() => setShowSettings(true)}>
+                                    <Icon name="settings" />
+                                </Button>
+                                <Button variant="ghost" onClick={handleLogout}>
+                                    <Icon name="log-out" />
+                                    <span className="hidden sm:inline">Ondoka</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <Card className="relative overflow-hidden p-6 glass-emerald text-white card-hover border-none shadow-xl shadow-emerald-200/50">
+                                <img 
+                                    src="https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=500" 
+                                    className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay" 
+                                    alt="bg"
+                                    referrerPolicy="no-referrer"
+                                />
+                                <div className="relative z-10">
+                                    <p className="text-emerald-50 font-medium flex items-center gap-2">
+                                        <Icon name="wallet" className="w-4 h-4" />
+                                        Salio Lililopo
+                                    </p>
+                                    <h3 className="text-3xl font-black mt-2">TSh {balance.toLocaleString()}</h3>
+                                </div>
+                            </Card>
+
+                            <Card className="relative overflow-hidden p-6 glass-white card-hover border-none shadow-xl shadow-slate-200/50">
+                                <img 
+                                    src="https://images.unsplash.com/photo-1553729459-efe14ef6055d?auto=format&fit=crop&q=80&w=500" 
+                                    className="absolute inset-0 w-full h-full object-cover opacity-5" 
+                                    alt="bg"
+                                    referrerPolicy="no-referrer"
+                                />
+                                <div className="relative z-10">
+                                    <p className="text-slate-500 font-medium flex items-center gap-2">
+                                        <Icon name="trending-up" className="w-4 h-4 text-emerald-600" />
+                                        Jumla ya Mapato
+                                    </p>
+                                    <h3 className="text-3xl font-black text-emerald-600 mt-2">TSh {totalIncome.toLocaleString()}</h3>
+                                </div>
+                            </Card>
+
+                            <Card className="relative overflow-hidden p-6 glass-white card-hover border-none shadow-xl shadow-slate-200/50">
+                                <img 
+                                    src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=500" 
+                                    className="absolute inset-0 w-full h-full object-cover opacity-5" 
+                                    alt="bg"
+                                    referrerPolicy="no-referrer"
+                                />
+                                <div className="relative z-10">
+                                    <p className="text-slate-500 font-medium flex items-center gap-2">
+                                        <Icon name="trending-down" className="w-4 h-4 text-red-500" />
+                                        Jumla ya Matumizi
+                                    </p>
+                                    <h3 className="text-3xl font-black text-red-500 mt-2">TSh {totalExpenses.toLocaleString()}</h3>
+                                    <div className="flex gap-3 mt-3 text-[10px] font-bold uppercase tracking-wider">
+                                        <span className="text-emerald-700 bg-emerald-100/50 px-2 py-1 rounded-lg backdrop-blur-sm">Lazima: {Math.round((necessaryExpenses/totalExpenses)*100 || 0)}%</span>
+                                        <span className="text-amber-700 bg-amber-100/50 px-2 py-1 rounded-lg backdrop-blur-sm">Anasa: {Math.round((luxuryExpenses/totalExpenses)*100 || 0)}%</span>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit overflow-x-auto max-w-full">
+                            {[
+                                { id: 'dashboard', label: 'Dashboard' },
+                                { id: 'transactions', label: 'Miamala' },
+                                { id: 'goals', label: 'Malengo' },
+                                { id: 'mipango', label: 'Mipango' }
+                            ].map(tab => (
+                                <button 
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`px-6 py-2 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {activeTab === 'dashboard' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <Card className="p-6 card-hover">
+                                    <h3 className="text-xl font-bold mb-6">Mchanganuo wa Matumizi</h3>
+                                    <div className="h-64">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={categoryData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                    {categoryData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </Card>
+                                <Card className="p-6 card-hover">
+                                    <h3 className="text-xl font-bold mb-4">Ushauri wa AI</h3>
+                                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 min-h-[150px]">
+                                        {isGettingAdvice ? (
+                                            <div className="flex items-center justify-center h-full">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                                            </div>
+                                        ) : advice ? (
+                                            <p className="text-slate-700 leading-relaxed">{advice}</p>
+                                        ) : (
+                                            <p className="text-slate-400 italic">Bonyeza kitufe kupata ushauri wa kifedha kutoka kwa AI...</p>
+                                        )}
+                                    </div>
+                                    <Button 
+                                        className="mt-4 w-full" 
+                                        variant="secondary"
+                                        onClick={async () => {
+                                            setIsGettingAdvice(true);
+                                            try {
+                                                const prompt = `Wewe ni mshauri wa kifedha wa Kitanzania. Hapa kuna data ya bajeti ya mtumiaji:
+                                                Mapato: ${JSON.stringify(income)}
+                                                Matumizi: ${JSON.stringify(expenses)}
+                                                Malengo: ${JSON.stringify(goals)}
+                                                
+                                                Toa ushauri mfupi na wa vitendo kwa Kiswahili kuhusu jinsi ya kuboresha nidhamu ya kifedha, kupunguza matumizi yasiyo ya lazima, na kufikia malengo ya akiba haraka zaidi. Tumia lugha ya kirafiki na ya kutia moyo.`;
+                                                
+                                                // Note: In a real standalone app, you'd need to handle the API key securely.
+                                                // For this environment, we'll try to use the injected key if available.
+                                                const finalKey = apiKey || "YOUR_GEMINI_API_KEY"; 
+                                                
+                                                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${finalKey}`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                                                });
+                                                const data = await response.json();
+                                                setAdvice(data.candidates[0].content.parts[0].text);
+                                            } catch (err) {
+                                                setAdvice("Samahani, nimeshindwa kupata ushauri. Hakikisha API Key imewekwa vizuri.");
+                                            } finally {
+                                                setIsGettingAdvice(false);
+                                            }
+                                        }}
+                                    >
+                                        <Icon name="brain-circuit" />
+                                        Pata Ushauri wa Akiba
+                                    </Button>
+                                </Card>
+                            </div>
+                        )}
+
+                        {activeTab === 'transactions' && (
+                            <div className="space-y-6">
+                                <Card className="p-6 card-hover">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                                        <h3 className="text-xl font-bold">Historia ya Miamala</h3>
+                                        <Button size="sm" onClick={() => {
+                                            setEditingId(null);
+                                            setNewTransaction({ description: '', amount: '', category: 'Chakula', type: 'expense', isNecessary: true });
+                                            setShowAddTransaction(true);
+                                        }}>+ Ongeza</Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                                        <div className="relative">
+                                            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Tafuta..." 
+                                                value={searchTerm}
+                                                onChange={e => setSearchTerm(e.target.value)}
+                                                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                            />
+                                        </div>
+                                        <select 
+                                            value={filterType} 
+                                            onChange={e => setFilterType(e.target.value)}
+                                            className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm bg-white"
+                                        >
+                                            <option value="all">Aina Zote</option>
+                                            <option value="income">Mapato Pekee</option>
+                                            <option value="expense">Matumizi Pekee</option>
+                                        </select>
+                                        <select 
+                                            value={filterCategory} 
+                                            onChange={e => setFilterCategory(e.target.value)}
+                                            className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm bg-white"
+                                        >
+                                            <option value="all">Makundi Yote</option>
+                                            {[
+                                                'Chakula', 'Kodi/Nyumba', 'Usafiri', 'Afya', 'Elimu', 
+                                                'Burudani', 'Mavazi', 'Mawasiliano (Vocha/Internet)', 
+                                                'Umeme/Maji', 'Akiba/Uwekezaji', 'Dharura', 
+                                                'Sadaka/Misaada', 'Nyingine'
+                                            ].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                        <select 
+                                            value={sortBy} 
+                                            onChange={e => setSortBy(e.target.value)}
+                                            className="px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm bg-white"
+                                        >
+                                            <option value="date-desc">Mpya Zaidi</option>
+                                            <option value="date-asc">Zamani Zaidi</option>
+                                            <option value="amount-desc">Kiasi Kikubwa</option>
+                                            <option value="amount-asc">Kiasi Kidogo</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {allTransactions.length === 0 && <p className="text-center text-slate-400 py-8">Hakuna miamala inayolingana na utafutaji wako.</p>}
+                                        {allTransactions.map(t => (
+                                            <div key={t.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl group hover:bg-emerald-50 transition-colors">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`p-2 rounded-xl shadow-sm transition-colors ${t.type === 'income' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                                        <Icon name={t.type === 'income' ? "trending-up" : "shopping-bag"} className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold">{t.description}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-xs text-slate-400">{t.category} • {new Date(t.date).toLocaleDateString()}</p>
+                                                            {t.type === 'expense' && t.isNecessary !== undefined && (
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${t.isNecessary ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                                    {t.isNecessary ? 'Lazima' : 'Anasa'}
+                                                                </span>
+                                                            )}
+                                                            {t.type === 'income' && (
+                                                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700">Mapato</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <p className={`font-black ${t.type === 'income' ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                        {t.type === 'income' ? '+' : '-'}TSh {t.amount.toLocaleString()}
+                                                    </p>
+                                                    <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => handleEditTransaction(t)} className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-emerald-600 transition-colors">
+                                                            <Icon name="edit-2" className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteTransaction(t.id)} className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors">
+                                                            <Icon name="trash-2" className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+                            </div>
+                        )}
+
+                        {activeTab === 'goals' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-xl font-bold">Malengo ya Akiba</h3>
+                                    <Button size="sm" onClick={() => setShowAddGoal(true)}>+ Lengo Jipya</Button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {goals.length === 0 && <p className="col-span-full text-center text-slate-400 py-8">Hujatengeneza malengo bado.</p>}
+                                    {goals.map(goal => (
+                                        <Card key={goal.id} className="p-6 space-y-4 card-hover">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h4 className="font-bold text-lg">{goal.name}</h4>
+                                                    <p className="text-sm text-slate-500">Lengo: TSh {goal.targetAmount.toLocaleString()}</p>
+                                                    {goal.deadline && (
+                                                        <p className="text-[10px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                                                            <Icon name="calendar" className="w-3 h-3" />
+                                                            Mwisho: {new Date(goal.deadline).toLocaleDateString()}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="bg-emerald-100 text-emerald-700 p-2 rounded-xl">
+                                                        <Icon name="target" />
+                                                    </div>
+                                                    <button onClick={() => handleDeleteGoal(goal.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                                                        <Icon name="trash-2" className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-sm">
+                                                    <span>Maendeleo</span>
+                                                    <span className="font-bold">{Math.round((goal.currentAmount / goal.targetAmount) * 100)}%</span>
+                                                </div>
+                                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                                    <div className="bg-emerald-600 h-full transition-all" style={{width: `${(goal.currentAmount / goal.targetAmount) * 100}%`}}></div>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'mipango' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <div className="space-y-6">
+                                        <Card className="p-8 glass-white border-none shadow-xl">
+                                            <h3 className="text-2xl font-black mb-4 flex items-center gap-2">
+                                                <Icon name="pie-chart" className="text-emerald-600" />
+                                                Sheria ya 50/30/20
+                                            </h3>
+                                            <p className="text-slate-600 mb-6">
+                                                Hii ni mbinu rahisi ya kupanga bajeti yako kwa kugawa mapato yako baada ya kodi katika makundi matatu makuu:
+                                            </p>
+                                            <div className="space-y-4">
+                                                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-bold text-emerald-700">50% - Mahitaji ya Lazima</span>
+                                                        <span className="text-xs font-black bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full">NEEDS</span>
+                                                    </div>
+                                                    <p className="text-xs text-emerald-600">Kodi, chakula, usafiri, umeme, maji, na madeni ya lazima.</p>
+                                                    <p className="mt-2 font-black text-emerald-800">TSh {(totalIncome * 0.5).toLocaleString()}</p>
+                                                </div>
+                                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-bold text-amber-700">30% - Matakwa/Anasa</span>
+                                                        <span className="text-xs font-black bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">WANTS</span>
+                                                    </div>
+                                                    <p className="text-xs text-amber-600">Burudani, kula nje, manunuzi yasiyo ya lazima, na hobby.</p>
+                                                    <p className="mt-2 font-black text-amber-800">TSh {(totalIncome * 0.3).toLocaleString()}</p>
+                                                </div>
+                                                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-bold text-blue-700">20% - Akiba na Uwekezaji</span>
+                                                        <span className="text-xs font-black bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">SAVINGS</span>
+                                                    </div>
+                                                    <p className="text-xs text-blue-600">Akiba ya dharura, kustaafu, na kulipa madeni makubwa.</p>
+                                                    <p className="mt-2 font-black text-blue-800">TSh {(totalIncome * 0.2).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                        </Card>
+
+                                        <Card className="p-8 glass-white border-none shadow-xl">
+                                            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                                <Icon name="lightbulb" className="text-amber-500" />
+                                                Vidokezo vya Kifedha
+                                            </h3>
+                                            <ul className="space-y-4">
+                                                {[
+                                                    { title: "Anza na Akiba ya Dharura", desc: "Lengo la kwanza liwe kuwa na akiba inayoweza kukulipia matumizi ya miezi 3-6." },
+                                                    { title: "Lipa Madeni Yenye Riba Kubwa", desc: "Tumia mbinu ya 'Debt Avalanche' kulipa madeni yenye riba kubwa kwanza." },
+                                                    { title: "Wekeza Mapema", desc: "Nguvu ya riba mchanganyiko (compound interest) hufanya kazi vizuri zaidi ukiwa na muda mrefu." },
+                                                    { title: "Fuatilia Kila Shilingi", desc: "Kujua wapi pesa yako inakwenda ndio hatua ya kwanza ya kuimiliki." }
+                                                ].map((tip, i) => (
+                                                    <li key={i} className="flex gap-4">
+                                                        <div className="bg-slate-100 w-8 h-8 rounded-full flex items-center justify-center font-bold text-slate-500 flex-shrink-0">{i+1}</div>
+                                                        <div>
+                                                            <p className="font-bold text-slate-800">{tip.title}</p>
+                                                            <p className="text-sm text-slate-500">{tip.desc}</p>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </Card>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <Card className="p-8 glass-white border-none shadow-xl">
+                                            <h3 className="text-xl font-bold mb-6">Hali Yako ya Sasa vs 50/30/20</h3>
+                                            <div className="space-y-8">
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="font-medium">Mahitaji (Target: 50%)</span>
+                                                        <span className={`font-bold ${ (necessaryExpenses/totalIncome) > 0.5 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                            {Math.round((necessaryExpenses/totalIncome)*100 || 0)}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                                                        <div className={`h-full transition-all ${ (necessaryExpenses/totalIncome) > 0.5 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${Math.min((necessaryExpenses/totalIncome)*100, 100)}%`}}></div>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 italic">
+                                                        {(necessaryExpenses/totalIncome) > 0.5 ? 'Unatumia zaidi ya 50% kwenye mahitaji. Jaribu kupunguza gharama zisizo za lazima.' : 'Hongera! Matumizi yako ya lazima yako ndani ya kiwango salama.'}
+                                                    </p>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="font-medium">Anasa (Target: 30%)</span>
+                                                        <span className={`font-bold ${ (luxuryExpenses/totalIncome) > 0.3 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                                                            {Math.round((luxuryExpenses/totalIncome)*100 || 0)}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                                                        <div className={`h-full transition-all ${ (luxuryExpenses/totalIncome) > 0.3 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{width: `${Math.min((luxuryExpenses/totalIncome)*100, 100)}%`}}></div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="font-medium">Akiba (Target: 20%)</span>
+                                                        <span className={`font-bold ${ (balance/totalIncome) < 0.2 ? 'text-blue-400' : 'text-emerald-600'}`}>
+                                                            {Math.round((balance/totalIncome)*100 || 0)}%
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                                                        <div className={`h-full transition-all bg-blue-500`} style={{width: `${Math.min((balance/totalIncome)*100, 100)}%`}}></div>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 italic">
+                                                        Hii ni asilimia ya salio lako la sasa dhidi ya jumla ya mapato.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </Card>
+
+                                        <Card className="p-8 bg-gradient-to-br from-slate-800 to-slate-900 text-white border-none shadow-xl relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                                <Icon name="trending-up" className="w-24 h-24" />
+                                            </div>
+                                            <div className="relative z-10">
+                                                <h4 className="text-lg font-bold mb-2">Nukuu ya Leo</h4>
+                                                <p className="text-slate-300 italic mb-4">"Usiweke akiba kile kilichobaki baada ya kutumia, bali tumia kile kilichobaki baada ya kuweka akiba."</p>
+                                                <p className="text-sm font-bold text-emerald-400">— Warren Buffett</p>
+                                            </div>
+                                        </Card>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Modals */}
+                    {showAddTransaction && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+                            <Card className="w-full max-w-md p-8 space-y-6">
+                                <h3 className="text-2xl font-black">{editingId ? 'Hariri Muamala' : 'Ongeza Muamala'}</h3>
+                                <div className="space-y-4">
+                                    <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+                                        <button 
+                                            onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
+                                            className={`flex-1 py-2 rounded-xl font-bold transition-all ${newTransaction.type === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500'}`}
+                                        >Matumizi</button>
+                                        <button 
+                                            onClick={() => setNewTransaction({...newTransaction, type: 'income'})}
+                                            className={`flex-1 py-2 rounded-xl font-bold transition-all ${newTransaction.type === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}
+                                        >Mapato</button>
+                                    </div>
+                                    <Input label="Maelezo" value={newTransaction.description} onChange={e => setNewTransaction({...newTransaction, description: e.target.value})} placeholder="Mf. Chakula cha mchana" />
+                                    <Input label="Kiasi (TSh)" type="number" value={newTransaction.amount} onChange={e => setNewTransaction({...newTransaction, amount: e.target.value})} placeholder="0" />
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-bold text-slate-700 ml-1">Kundi</label>
+                                        <select 
+                                            value={newTransaction.category} 
+                                            onChange={e => setNewTransaction({...newTransaction, category: e.target.value})}
+                                            className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all bg-white/50"
+                                        >
+                                            {[
+                                                'Chakula', 'Kodi/Nyumba', 'Usafiri', 'Afya', 'Elimu', 
+                                                'Burudani', 'Mavazi', 'Mawasiliano (Vocha/Internet)', 
+                                                'Umeme/Maji', 'Akiba/Uwekezaji', 'Dharura', 
+                                                'Sadaka/Misaada', 'Nyingine'
+                                            ].map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                    {newTransaction.type === 'expense' && (
+                                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                            <div>
+                                                <p className="font-bold text-sm text-slate-700">Matumizi ya Lazima?</p>
+                                                <p className="text-xs text-slate-500">Zima kama ni anasa au si lazima</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => setNewTransaction({...newTransaction, isNecessary: !newTransaction.isNecessary})}
+                                                className={`w-12 h-6 rounded-full transition-all relative ${newTransaction.isNecessary ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                                            >
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${newTransaction.isNecessary ? 'right-1' : 'left-1'}`}></div>
+                                            </button>
+                                        </div>
+                                    )}
+                                    <div className="flex gap-3 pt-2">
+                                        <Button className="flex-1" onClick={handleAddTransaction}>Hifadhi</Button>
+                                        <Button variant="secondary" className="flex-1" onClick={() => setShowAddTransaction(false)}>Ghairi</Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+
+                    {showAddGoal && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+                            <Card className="w-full max-w-md p-8 space-y-6">
+                                <h3 className="text-2xl font-black">Lengo Jipya</h3>
+                                <div className="space-y-4">
+                                    <Input label="Jina la Lengo" value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})} placeholder="Mf. Kununua Kiwanja" />
+                                    <Input label="Kiasi Kinachohitajika (TSh)" type="number" value={newGoal.targetAmount} onChange={e => setNewGoal({...newGoal, targetAmount: e.target.value})} placeholder="0" />
+                                    <Input label="Tarehe ya Kikomo (Deadline)" type="date" value={newGoal.deadline} onChange={e => setNewGoal({...newGoal, deadline: e.target.value})} />
+                                    <div className="flex gap-3 pt-2">
+                                        <Button className="flex-1" onClick={handleAddGoal}>Anza Lengo</Button>
+                                        <Button variant="secondary" className="flex-1" onClick={() => setShowAddGoal(false)}>Ghairi</Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+
+                    {showSettings && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+                            <Card className="w-full max-w-md p-8 space-y-6">
+                                <h3 className="text-2xl font-black">Mipangilio</h3>
+                                <div className="space-y-4">
+                                    <Input 
+                                        label="Gemini API Key" 
+                                        type="password" 
+                                        value={apiKey} 
+                                        onChange={e => {
+                                            setApiKey(e.target.value);
+                                            localStorage.setItem('budget_api_key', e.target.value);
+                                        }} 
+                                        placeholder="Weka API Key hapa" 
+                                    />
+                                    <p className="text-xs text-slate-400">API Key inahitajika ili kupata ushauri wa AI kupitia Gemini 1.5 Flash. Unaweza kuipata bure kwenye Google AI Studio.</p>
+                                    <Button className="w-full" onClick={() => setShowSettings(false)}>Funga</Button>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+
+                    {/* Mobile Nav */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-slate-100 p-4 flex justify-around items-center sm:hidden z-50">
+                        <button onClick={() => setActiveTab('dashboard')} className={`p-2 rounded-xl ${activeTab === 'dashboard' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}><Icon name="layout-dashboard" /></button>
+                        <button onClick={() => setActiveTab('transactions')} className={`p-2 rounded-xl ${activeTab === 'transactions' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}><Icon name="list" /></button>
+                        <button onClick={() => setActiveTab('goals')} className={`p-2 rounded-xl ${activeTab === 'goals' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}><Icon name="target" /></button>
+                        <button onClick={() => setActiveTab('mipango')} className={`p-2 rounded-xl ${activeTab === 'mipango' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}><Icon name="pie-chart" /></button>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
